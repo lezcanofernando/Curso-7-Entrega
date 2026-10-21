@@ -13,28 +13,36 @@ from typing_extensions import TypedDict
 class Aporte(TypedDict):
     """Lo que entregó un especialista en un turno."""
 
-    agente: str       # "investigador" o "analista"
+    agente: str       # "investigador", "analista", "aprobacion_humana" o "ejecutor"
     instruccion: str  # qué le pidió el supervisor
     resultado: str    # qué respondió el especialista
+
+
+class CambioPrecio(TypedDict):
+    """Acción crítica que propone el supervisor y que un humano debe aprobar."""
+
+    producto: str        # ej. "yerba"
+    nuevo_precio: float  # precio a aplicar en Supermercados del Valle
+    motivo: str          # por qué se propone el cambio
 
 
 class OrquestadorState(MessagesState):
     """Estado del grafo.
 
     Hereda `messages` de MessagesState (historial de la conversación) y suma:
-    - next_agent: a quién eligió el supervisor ("investigador", "analista" o "FINISH").
+    - next_agent: a quién eligió el supervisor ("investigador", "analista", "ejecutor" o "FINISH").
     - instruccion: la tarea concreta que el supervisor le da al especialista.
     - aportes: registro de qué agente contribuyó con qué. Usa `operator.add` como
       reducer, así cada especialista AGREGA su aporte a la lista en vez de pisarla.
     - pasos: cuántas decisiones tomó el supervisor (sirve para cortar bucles).
-    - task_completed: True cuando el supervisor da la tarea por terminada.
+    - cambio_precio: el cambio de precio propuesto, que espera aprobación humana.
     """
 
     next_agent: str
     instruccion: str
     aportes: Annotated[list[Aporte], operator.add]
     pasos: int
-    task_completed: bool
+    cambio_precio: CambioPrecio | None
 
 
 def formatear_aportes(aportes: list[Aporte]) -> str:

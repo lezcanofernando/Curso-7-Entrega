@@ -7,8 +7,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from config import get_llm, medir_tiempo
-from state import OrquestadorState
+from app.config import get_llm, medir_tiempo
+from app.state import OrquestadorState
 
 # Análisis de sentimiento simple por palabras clave (fácil de entender y de verificar).
 POSITIVAS = {"buena", "bueno", "buen", "excelente", "rica", "rico", "fresca", "recomendable", "suave", "rinde"}

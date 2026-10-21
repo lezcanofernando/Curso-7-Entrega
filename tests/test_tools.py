@@ -2,8 +2,8 @@
 
 import pytest
 
-from agents.analyst_agent import analizar_sentimiento, comparar_precios
-from agents.research_agent import buscar_en_fuentes, cargar_fuentes
+from app.agents.analyst_agent import analizar_sentimiento, comparar_precios
+from app.agents.research_agent import buscar_en_fuentes, cargar_fuentes
 
 
 # ---------- Investigador ----------

@@ -1,5 +1,21 @@
-langgraph>=1.0.0
-langchain-core>=1.0.0
-langchain-anthropic>=1.0.0
+# Orquestador multi-agente (Entrega 6)
+langgraph>=1.2.0
+langchain-core>=1.6.0
+langchain-anthropic>=1.7.0
 python-dotenv>=1.0.0
+
+# API asíncrona
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.28.0
+
+# Estado de los jobs + checkpoints de LangGraph en Redis
+redis>=5.2.0
+langgraph-checkpoint-redis>=0.5.0
+
+# Observabilidad
+langsmith>=0.4.0
+
+# Tests
 pytest>=8.0
+fakeredis>=2.26.0

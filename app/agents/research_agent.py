@@ -12,10 +12,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 
-from config import get_llm, medir_tiempo
-from state import OrquestadorState
+from app.config import get_llm, medir_tiempo
+from app.state import OrquestadorState
 
-RUTA_FUENTES = Path(__file__).parent.parent / "data" / "fuentes.json"
+RUTA_FUENTES = Path(__file__).parents[2] / "data" / "fuentes.json"
 
 
 def cargar_fuentes(ruta: Path = RUTA_FUENTES) -> list[dict]:
