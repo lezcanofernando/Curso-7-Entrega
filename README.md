@@ -134,19 +134,34 @@ Si falta una variable obligatoria, la API corta al inicio con un mensaje que dic
 
 ### 3. Levantar Redis
 
-Con Docker Desktop abierto, el comando es el mismo en todos los sistemas:
+El `RedisSaver` de LangGraph necesita **Redis 8** con los módulos `search` y `ReJSON`.
+
+**Opción A: Docker** (Docker Desktop abierto, el mismo comando en todos los sistemas):
 
 ```bash
 docker compose up -d redis
-```
-
-Se usa la imagen `redis:8.2`, que ya trae los módulos de búsqueda y JSON que necesita el `RedisSaver` de LangGraph. Para verificar que está andando:
-
-```bash
 docker compose exec redis redis-cli ping
 ```
 
-Tiene que responder `PONG`.
+Tiene que responder `PONG`. La imagen `redis:8.2` ya trae los módulos.
+
+**Opción B: sin Docker** (Linux, o Windows con WSL2 si tu versión de Windows no soporta Docker Desktop):
+
+En Windows, primero instalá Ubuntu desde PowerShell como administrador con `wsl --install -d Ubuntu`, y corré lo que sigue adentro de Ubuntu. Hay que usar el **repositorio oficial de Redis**: el paquete de Ubuntu trae Redis 8 sin los módulos `search` y `ReJSON`.
+
+```bash
+sudo apt-get update && sudo apt-get install -y lsb-release curl gpg
+curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+sudo chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+sudo apt-get update && sudo apt-get install -y redis redis-server redis-tools
+sudo systemctl enable --now redis-server
+redis-cli MODULE LIST | grep -A1 name
+```
+
+En la lista tienen que aparecer `search` y `ReJSON`. WSL2 comparte `localhost` con Windows, así que la API corriendo en Windows se conecta con `REDIS_URL=redis://localhost:6379`. Si reiniciás la PC, abrí Ubuntu una vez para que Redis vuelva a arrancar.
+
+En los comandos de las secciones siguientes, si usás la opción B, reemplazá `docker compose exec redis redis-cli` por `wsl redis-cli`.
 
 ### 4. Levantar la API
 
