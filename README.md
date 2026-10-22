@@ -255,12 +255,22 @@ Con `LANGSMITH_TRACING=true`, LangSmith registra solo cada nodo del grafo, cada 
 
 > Un job con aprobación humana genera **dos trazas**: una hasta la pausa y otra desde la reanudación.
 
-### Cómo leer las métricas de la corrida
+### Resultados de la corrida (21/10/2026)
 
-1. **Trazas:** en el proyecto `supermercados-del-valle-e7` aparecen las 5 trazas `tarea_orquestador`. Al abrir una se ve el árbol de nodos (`supervisor`, `investigador`, `analista`, `sintetizador`) con la latencia y los tokens de cada uno.
-2. **Costo por ejecución:** la columna *Cost* de la tabla de trazas. LangSmith la calcula sola con los tokens de entrada y salida y su tabla de precios de modelos. Si para `claude-sonnet-5-5` aparece vacía, agregá el precio del modelo en *Settings → Model Pricing* (patrón `claude-sonnet-5-5`, con los precios por token de la página de precios de Anthropic).
-3. **Latencia p95:** en *Monitoring* (o en un dashboard propio con *Add chart*), elegí la métrica de latencia de las trazas con el percentil **p95**, filtrado a la ventana de tiempo de la corrida.
-4. **Dónde se concentra la latencia y los tokens:** al abrir una traza y comparar los nodos, los que más pesan son los agentes ReAct (`investigador` y `analista`), porque hacen varias llamadas al LLM (pensar → herramienta → responder). El `supervisor` se llama varias veces por tarea, pero cada llamada es corta. El `ejecutor` no usa el LLM.
+Las 5 peticiones concurrentes son las 5 trazas `tarea_orquestador` que empiezan a las **9:00:03 PM**, todas en el mismo segundo. LangSmith calcula el costo solo, a partir de los tokens de entrada y salida:
+
+| Pregunta | Latencia | Tokens | Costo |
+|---|---|---|---|
+| Noticias de la yerba | 13,04 s | 7,2 K | $0,0216 |
+| Reseñas del aceite | 25,12 s | 13,6 K | $0,0397 |
+| Precio del aceite | 27,20 s | 15,3 K | $0,0493 |
+| Precio de la leche | 40,16 s | 15,6 K | $0,0507 |
+| Opiniones y precio de la yerba | 41,49 s | 21,1 K | $0,0753 |
+
+- **Costo por ejecución:** entre $0,02 y $0,08, con un promedio de **≈ $0,047**. El costo crece con la cantidad de especialistas que intervienen: la pregunta de noticias solo usa al Investigador y es la más barata.
+- **Latencia p95: 40,2 s.** Sale de un gráfico propio en *Dashboards → Add chart*, con la métrica *Latency*, agregación *Percentile 95* y el filtro *Is Trace = true*. El gráfico abarca las 9 trazas de los últimos 7 días, no solo las 5 de la carga.
+- **Dónde se concentra la latencia:** según el árbol de la traza más lenta (41,49 s), el tiempo se reparte entre las llamadas a Claude. Cada decisión del `supervisor` tarda 3 a 4,5 s, y los agentes ReAct (`investigador` y `analista`) suman varias llamadas cada uno (pensar → herramienta → responder). Las herramientas en sí tardan 0,00 a 0,02 s, así que casi todo el tiempo es del LLM.
+- **Qué nodo consume más tokens:** el `supervisor`. Se llama 3 o 4 veces por tarea y su contexto crece con cada aporte: en la traza de la demo HITL pasa de unos 2 K a unos 3,4 K tokens por llamada. Cada llamada de los especialistas usa entre 1 K y 1,9 K.
 
 ### Capturas
 
@@ -268,11 +278,13 @@ En [screenshots/](screenshots/):
 
 | Archivo | Qué muestra |
 |---|---|
-| `01_trazas.png` | Lista de trazas de las 5 peticiones concurrentes. |
-| `02_traza_detalle.png` | Árbol de nodos de una traza, con la latencia y los tokens de cada nodo. |
-| `03_costo_por_ejecucion.png` | Costo de cada una de las 5 ejecuciones. |
-| `04_latencia_p95.png` | Latencia p95 de la corrida. |
-| `05_hitl.png` | Traza de un job pausado en `aprobacion_humana` y su reanudación. |
+| [00_resumen_proyecto.png](screenshots/00_resumen_proyecto.png) | Resumen del proyecto: 9 trazas exitosas y 0 fallidas, latencia P50/P99, costo total y herramientas usadas. |
+| [01_trazas_y_costo.png](screenshots/01_trazas_y_costo.png) | Lista de trazas con latencia, tokens y **costo por ejecución**. Las 5 de las 9:00:03 PM son la prueba de carga. |
+| [02_traza_detalle.png](screenshots/02_traza_detalle.png) | Árbol de nodos de la traza más lenta (41,49 s), con la latencia y los tokens de cada llamada a Claude. |
+| [03_latencia_p95.png](screenshots/03_latencia_p95.png) | **Latencia p95 = 40,2 s**, desde un dashboard propio. |
+| [04_hitl.png](screenshots/04_hitl.png) | Traza de la demo HITL: el grafo termina en `aprobacion_humana` y la salida muestra la `interrupcion` (`accion: actualizar_precio`). |
+
+> En la columna *Input* de las trazas aparece el objeto del grafo (`CompiledStateGraph`), porque es el primer argumento de la función decorada con `@traceable`. La pregunta del usuario se ve al abrir la traza, en `entrada → messages`.
 
 ## Errores comunes que se evitan
 
