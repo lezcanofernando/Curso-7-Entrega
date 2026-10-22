@@ -237,14 +237,14 @@ Envía 5 preguntas distintas **al mismo tiempo** (`asyncio.gather`), hace pollin
 ```
 Enviando 5 tareas concurrentes a http://localhost:8000 ...
 
-0b23dc34  DONE                32.9 s  investigador -> analista
-aaea6f49  DONE                26.4 s  investigador -> analista
-83b267fc  DONE                24.4 s  investigador -> analista
-0007c10a  DONE                16.4 s  investigador
-70bfc452  DONE                28.5 s  investigador -> analista
+a037ba2d  DONE                42.5 s  investigador -> analista
+a9963318  DONE                40.5 s  investigador -> analista
+10722c1a  DONE                26.4 s  investigador -> analista
+cdff28a5  DONE                14.4 s  investigador
+4f23c7fc  DONE                28.4 s  investigador -> analista
 
-Tiempo total: 32.9 s (si fuera secuencial sería ~129 s)
-Latencia vista por el cliente: p50 = 26.4 s · p95 = 32.0 s
+Tiempo total: 42.5 s (si fuera secuencial sería ~152 s)
+Latencia vista por el cliente: p50 = 28.4 s · p95 = 42.1 s
 ```
 
 Las 5 tareas corren en paralelo: el tiempo total es el de la más lenta, no la suma. El p95 del script es una referencia del lado del cliente. Las métricas que se entregan son las del dashboard (siguiente sección).
@@ -277,7 +277,7 @@ En [screenshots/](screenshots/):
 ## Errores comunes que se evitan
 
 - **No bloquear el event loop:** los endpoints son `async` y usan el cliente asíncrono `redis.asyncio`. El grafo, que es sincrónico, corre en un hilo con `asyncio.to_thread`. El `setup()` del `RedisSaver` también corre en un hilo.
-- **Excepciones en segundo plano:** `procesar()` en [app/worker.py](app/worker.py) envuelve la ejecución en `try/except`. Ante cualquier error, el job queda en `FAILED` con el mensaje en el campo `error`. Si llega un mensaje roto a la cola, se registra en el log y el worker sigue andando.
+- **Excepciones en segundo plano:** `procesar()` en [app/worker.py](app/worker.py) envuelve la ejecución en `try/except`. Ante cualquier error, el job queda en `FAILED` con el mensaje en el campo `error`. Si llega un mensaje roto a la cola, se registra en el log y el worker sigue andando. Si falla la lectura de la cola (por ejemplo, un corte de Redis), el worker lo registra y reintenta. Además, el `BLPOP` espera 1 s, menos que el `socket_timeout` de 5 s que `redis-py` 8 usa por defecto. Si esperara más, el cliente cortaría con `TimeoutError`.
 - **Nodo HITL sin efectos antes del `interrupt()`:** al reanudar, LangGraph vuelve a correr el nodo desde el principio. Por eso `aprobacion_humana` no llama al LLM ni escribe nada antes de pausar.
 
 ## Logs
@@ -303,10 +303,10 @@ Cada nodo registra cuánto tardó, y cada job su estado final. Ejemplo real del 
 pytest
 ```
 
-Son 26 tests que **no llaman a la API de Anthropic ni necesitan Redis**: usan `fakeredis` (un Redis en memoria) y el `InMemorySaver` de LangGraph. Cubren:
+Son 28 tests que **no llaman a la API de Anthropic ni necesitan Redis**: usan `fakeredis` (un Redis en memoria) y el `InMemorySaver` de LangGraph. Cubren:
 
 - **API:** `POST /tasks` devuelve 202 y encola, validación de la pregunta (422), 404 de un job inexistente y 409 si se aprueba un job que no espera aprobación.
-- **Worker:** un grafo que lanza una excepción deja el job en `FAILED`. También el flujo completo: `WAITING_APPROVAL` → aprobación → `DONE`, con el precio escrito en Redis.
+- **Worker:** un grafo que lanza una excepción deja el job en `FAILED`. Un error de Redis al leer la cola no mata al worker. La pausa se detecta aunque `get_state()` no la muestre (pasa con `RedisSaver`). También el flujo completo: `WAITING_APPROVAL` → aprobación → `DONE`, con el precio escrito en Redis.
 - **HITL:** el grafo se pausa antes del ejecutor; si se aprueba aplica el cambio y si se rechaza no toca nada.
 - **Supervisor:** el ruteo (el `ejecutor` siempre pasa por `aprobacion_humana`), el corte por `MAX_PASOS` y el pedido de `ejecutor` sin cambio concreto.
 - **Herramientas y `data/`:** búsqueda, sentimiento, comparación de precios, y archivo faltante, inválido o vacío.

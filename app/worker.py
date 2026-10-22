@@ -19,6 +19,7 @@ import time
 
 from langgraph.types import Command
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 from app import config
 from app.config import logger
@@ -29,13 +30,15 @@ from app.observability import traceable
 @traceable(name="tarea_orquestador", run_type="chain")
 def ejecutar_grafo(grafo, entrada, cfg: dict) -> dict:
     """Corre (o reanuda) el grafo y resume cómo quedó. Es UNA traza en LangSmith por llamada."""
-    grafo.invoke(entrada, cfg)
-    snapshot = grafo.get_state(cfg)
-    valores = snapshot.values
+    salida = grafo.invoke(entrada, cfg)
+    # Si el grafo se pausó en un interrupt(), invoke lo devuelve en la clave "__interrupt__".
+    # (No uso get_state().interrupts: con RedisSaver viene vacío aunque el grafo esté pausado.)
+    interrupciones = salida.get("__interrupt__")
+    valores = grafo.get_state(cfg).values
     return {
         "resultado": valores["messages"][-1].text if valores.get("messages") else "",
         "recorrido": [a["agente"] for a in valores.get("aportes", [])],
-        "interrupcion": snapshot.interrupts[0].value if snapshot.interrupts else None,
+        "interrupcion": interrupciones[0].value if interrupciones else None,
     }
 
 
@@ -82,9 +85,17 @@ async def worker_loop(nombre: str, grafo, r: Redis) -> None:
     """Bucle infinito: espera un mensaje en la cola (BLPOP) y lo procesa."""
     logger.info("%s esperando tareas", nombre)
     while True:
-        item = await r.blpop([COLA], timeout=5)
+        try:
+            # El timeout del BLPOP tiene que ser MENOR que el socket_timeout del cliente
+            # (5 s por defecto en redis-py 8). Si no, redis-py lanza TimeoutError.
+            item = await r.blpop([COLA], timeout=1)
+        except RedisError:
+            # Un corte de Redis no debe matar al worker: lo registro y reintento.
+            logger.exception("%s: error leyendo la cola, reintento en 2 s", nombre)
+            await asyncio.sleep(2)
+            continue
         if item is None:
-            continue  # no llegó nada en 5 s: vuelvo a esperar
+            continue  # no llegó nada en 1 s: vuelvo a esperar
         try:
             await procesar(json.loads(item[1]), grafo, r)
         except Exception:
